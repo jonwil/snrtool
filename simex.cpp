@@ -4252,4 +4252,41 @@ extern "C"
     {
         rw::audio::core::System::GetInstance()->Release();
     }
+
+    void SIMEX_setplayloc(SINFO* info, int playloc)
+    {
+        info->sound[0]->playloc = (short)playloc;
+    }
+
+    void SIMEX_setcodec(SINFO* info, int codec)
+    {
+        info->sound[0]->codec = (unsigned char)codec;
+    }
+
+    void SIMEX_setvbrquality(SINFO* info, int quality)
+    {
+        info->sound[0]->bitrate = quality;
+    }
+
+    int SIMEX_getsamplerate(SINFO* info)
+    {
+        return info->sound[0]->sample_rate;
+    }
+
+    void SIMEX_resample(SINFO* info, int sample_rate)
+    {
+        SIMEXFILTERPARAM param;
+        param.intparam = sample_rate;
+        SIMEX_filterssound(info->sound[0], resample, &param);
+    }
+
+    int SIMEX_getchannelconfig(SINFO* info)
+    {
+        return info->sound[0]->channel_config;
+    }
+
+    int SIMEX_getnumsamples(SINFO* info)
+    {
+        return info->sound[0]->num_samples;
+    }
 }

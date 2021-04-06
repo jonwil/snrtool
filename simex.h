@@ -364,4 +364,11 @@ extern "C"
     SIMEX_API int SIMEX_write(SINSTANCE* instance, SINFO* info, int element);
     SIMEX_API void SIMEX_init();
     SIMEX_API void SIMEX_shutdown();
+    SIMEX_API void SIMEX_setplayloc(SINFO* info, int playloc);
+    SIMEX_API void SIMEX_setcodec(SINFO* info, int codec);
+    SIMEX_API void SIMEX_setvbrquality(SINFO* info, int quality);
+    SIMEX_API int SIMEX_getsamplerate(SINFO* info);
+    SIMEX_API void SIMEX_resample(SINFO* info, int sample_rate);
+    SIMEX_API int SIMEX_getchannelconfig(SINFO* info);
+    SIMEX_API int SIMEX_getnumsamples(SINFO* info);
 }
