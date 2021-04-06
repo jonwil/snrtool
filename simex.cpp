@@ -53,7 +53,7 @@ void gputi(unsigned char* ptr, unsigned int data, int bytes)
 {
     for (int i = bytes; i; --i)
     {
-        *ptr++ = data;
+        *ptr++ = (unsigned char)data;
         data >>= 8;
     }
 }
@@ -335,7 +335,7 @@ l1:
         {
             sound->sample_rate = ggeti(&buf3[12], 4);
             sound->num_samples = ggeti(&buf2[4], 4) / sound->channel_config;
-            short bps = ggeti(&buf3[22], 2);
+            short bps = (short)ggeti(&buf3[22], 2);
             if (bps == 8)
             {
                 sound->codec = u8_int;
@@ -410,7 +410,7 @@ int decode_s16l_int(STDSTREAM* file, int numchannels, int firstsample, int sampl
                 SIMEX_seterror("Couldn't read 16-bit samples from file.");
                 return 0;
             }
-            outsamples[j][i] = ggeti(buf, 2);
+            outsamples[j][i] = (short)ggeti(buf, 2);
         }
     }
     return 1;
@@ -1207,8 +1207,8 @@ int sndplayerinfo(SINSTANCE* instance, SINFO** info, int element)
         if (header.validate())
         {
             bool loop = header.loop_flag == 0;
-            char version = header.version;
-            char channel_config = header.channel_config;
+            char version = (char)header.version;
+            char channel_config = (char)header.channel_config;
             float sampleperiod = (float)header.prefech_samples / (float)header.sample_rate;
             int sample_rate = header.sample_rate;
             instance->version = header.version;
@@ -1224,7 +1224,7 @@ int sndplayerinfo(SINSTANCE* instance, SINFO** info, int element)
                 sound->loopend = num_samples - 1;
             }
             if (header.playloc)
-                sound->playloc = header.playloc != 1 ? PLAYLOC_GIGASAMPLE : PLAYLOC_STREAM;
+                sound->playloc = (short)(header.playloc != 1 ? PLAYLOC_GIGASAMPLE : PLAYLOC_STREAM);
             else
                 sound->playloc = PLAYLOC_RAM;
             switch (header.codec)
@@ -1275,7 +1275,7 @@ int sndplayerinfo(SINSTANCE* instance, SINFO** info, int element)
                 result = 1;
                 break;
             default:
-                sound->codec = -1;
+                sound->codec = 0xFF;
                 sound->bitrate = -1;
                 result = 1;
                 break;
@@ -2199,7 +2199,6 @@ int EncodeVersion0Snr(const char* filename, SSOUND* sound)
     getpath(filename2, outpath, 1024);
     _wremove(outpath);
     STDSTREAM* file1 = gwopen(filename2);
-    STDSTREAM* file2 = 0;
     if (buildseektable)
     {
         //seek tables not supported
@@ -2251,7 +2250,7 @@ int EncodeVersion0Snr(const char* filename, SSOUND* sound)
     }
     if (i6 > 0)
     {
-        int isstream;
+        int isstream = 0;
         int shouldflush;
         int numsamplesin;
         for (;;)
@@ -2291,7 +2290,7 @@ int EncodeVersion0Snr(const char* filename, SSOUND* sound)
                 else
                 {
                     numsamplesin = sound->loopstart;
-                    if (prefech_samples >= loopstart)
+                    if (prefech_samples >= sound->loopstart)
                     {
                         helper->SetIsChunked(false);
                     }
@@ -2303,12 +2302,12 @@ int EncodeVersion0Snr(const char* filename, SSOUND* sound)
                     }
                 }
             }
-            else if (loopstart >= 0)
+            else if (sound->loopstart >= 0)
             {
                 numsamplesin = prefech_samples;
                 if (sampleoffset >= prefech_samples)
                 {
-                    if (sampleoffset >= loopstart)
+                    if (sampleoffset >= sound->loopstart)
                     {
                         isstream = 1;
                         numsamplesin = sound->loopend - sampleoffset + 1;
@@ -2318,21 +2317,21 @@ int EncodeVersion0Snr(const char* filename, SSOUND* sound)
                     else
                     {
                         shouldflush = 1;
-                        numsamplesin = loopstart - sampleoffset;
+                        numsamplesin = sound->loopstart - sampleoffset;
                         i2 = 1;
                         isstream = 1;
                     }
                 }
                 else
                 {
-                    if (loopstart >= prefech_samples)
+                    if (sound->loopstart >= prefech_samples)
                     {
                         isstream = 0;
                         i2 = 1;
                         shouldflush = 0;
                         goto l3;
                     }
-                    if (sampleoffset >= loopstart)
+                    if (sampleoffset >= sound->loopstart)
                     {
                         numsamplesin = prefech_samples - loopstart;
                     }
@@ -3253,322 +3252,6 @@ SIMEXFILTERABOUT filterabout[300] = {
 { nullptr, nullptr, nullptr, 0, 0, 0, nullptr }
 };
 
-SIMEXFILTERABOUT* SIMEX_filterabout(int type)
-{
-    if (type <= 299)
-    {
-        return (filterabout[type].name != 0 ? &filterabout[type] : 0);
-    }
-    SIMEX_seterror("Filter type is out of range.");
-    return 0;
-}
-
-int SIMEX_filterssound(SSOUND* sound, int filter, SIMEXFILTERPARAM* param)
-{
-    if (filterfuncs[filter])
-    {
-        return filterfuncs[filter](sound, param);
-    }
-    SIMEX_seterror("Filter type is not implemented.");
-    return -1;
-}
-
-const char* SIMEX_getlasterr()
-{
-    return simexerror;
-}
-
-int SIMEX_about(int type, SABOUT* about)
-{
-    if (about)
-    {
-        if (type > 55)
-        {
-            SIMEX_seterror("The file format passed to SIMEX_about is not supported.");
-            return 0;
-        }
-        else if (simexfuncs[type].aboutfunc)
-        {
-            memset(about, 0, sizeof(SABOUT));
-            return simexfuncs[type].aboutfunc(about);
-        }
-        else
-        {
-            SIMEX_seterror("The file format passed to SIMEX_about is not supported.");
-            return 0;
-        }
-    }
-    else
-    {
-        SIMEX_seterror("A NULL SABOUT was passed to SIMEX_about.");
-        return 0;
-    }
-}
-
-int SIMEX_id(const char* filename, long long offset)
-{
-    int i1 = -1;
-    int i2 = 0;
-    int i3 = 0;
-    STDSTREAM *stream = gopen(filename);
-    if (stream)
-    {
-        gseek(stream, offset);
-    }
-    int i4 = 0;
-    int i5[1];
-    i5[0] = mpeg;
-    int i6 = 0;
-    int i = 0;
-    while (2)
-    {
-        int i7 = 0;
-        while (i4 != i5[i7])
-        {
-            if (++i7 >= 1)
-            {
-                if (simexfuncs[i].idfunc && simexfuncs[i].isvalid)
-                {
-                    int i8 = simexfuncs[i].idfunc(filename, offset, stream);
-                    i3 = i8;
-                    if (i8 > i2)
-                    {
-                        i2 = i8;
-                        i1 = i6;
-                    }
-                    if (stream)
-                    {
-                        gseek(stream, offset);
-                    }
-                }
-                if (i3 == 100)
-                {
-                    goto l1;
-                }
-                i4 = i6;
-                break;
-            }
-        }
-        ++i4;
-        ++i;
-        i6 = i4;
-        if (i < 56)
-        {
-            continue;
-        }
-        break;
-    }
-l1:
-    if (i2 != 100)
-    {
-        int i9 = 0;
-        for (i = 0; i < 1; ++i)
-        {
-            int i10 = i5[i9];
-            if (simexfuncs[i10].idfunc && simexfuncs[i10].isvalid)
-            {
-                int i12 = simexfuncs[i10].idfunc(filename, offset, stream);
-                i3 = i12;
-                if (i12 > i2)
-                {
-                    i2 = i12;
-                    i1 = i10;
-                }
-                if (stream)
-                {
-                    gseek(stream, offset);
-                }
-            }
-            if (i3 == 100)
-            {
-                break;
-            }
-            i9 = i + 1;
-        }
-    }
-    if (stream)
-    {
-        gclose(stream);
-    }
-    return i1;
-}
-
-int SIMEX_open(const char* filename, long long fileoffset, int filetype, SINSTANCE** instance)
-{
-    int i1 = 0;
-    if (filetype <= 55)
-    {
-        bool b = simexfuncs[filetype].openfunc == 0;
-        if (!b)
-        {
-            *instance = new SINSTANCE;
-            if (*instance)
-            {
-                memset(*instance, 0, sizeof(SINSTANCE));
-                (*instance)->numsounds = 1;
-                (*instance)->fileoffset = fileoffset;
-                (*instance)->filetype = filetype;
-                const char *c1 = filename;
-                char *c2 = (*instance)->filename;
-                char c;
-                do
-                {
-                    c = *c1;
-                    *c2++ = *c1++;
-                } while (c);
-                (*instance)->filestruct = gopen(filename);
-                if ((*instance)->filestruct)
-                {
-                    gseek((*instance)->filestruct, fileoffset);
-                }
-                i1 = simexfuncs[filetype].openfunc(*instance);
-                if (i1 > 0)
-                {
-                    return i1;
-                }
-            }
-            if ((*instance)->filestruct)
-            {
-                gclose((*instance)->filestruct);
-            }
-            if (*instance)
-            {
-                delete (*instance);
-                *instance = 0;
-            }
-            return i1;
-        }
-    }
-    SIMEX_seterror("The file format passed to SIMEX_open is not supported.");
-    return 0;
-}
-
-int SIMEX_info(SINSTANCE* instance, SINFO** info, int element)
-{
-    int filetype = instance->filetype;
-    if (filetype >= 0 && filetype < 56 && simexfuncs[filetype].infofunc)
-    {
-        gseek(instance->filestruct, instance->fileoffset);
-        return simexfuncs[instance->filetype].infofunc(instance, info, element);
-    }
-    else
-    {
-        *info = 0;
-        SIMEX_seterror("The file format passed to SIMEX_info is not supported.");
-        return 0;
-    }
-}
-
-int SIMEX_read(SINSTANCE* instance, SINFO* info, int element)
-{
-    if (info)
-    {
-        int filetype = instance->filetype;
-        if (filetype >= 0 && filetype < 56 && simexfuncs[filetype].readfunc)
-        {
-            gseek(instance->filestruct, instance->fileoffset);
-            return simexfuncs[instance->filetype].readfunc(instance, info, element);
-        }
-        else
-        {
-            SIMEX_seterror("The file format passed to SIMEX_read is not supported.");
-            return 0;
-        }
-    }
-    else
-    {
-        SIMEX_seterror("A NULL SINFO structure was passed to SIMEX_read.");
-        return 0;
-    }
-}
-
-int SIMEX_close(SINSTANCE* inst)
-{
-    int filetype = inst->filetype;
-    int i1 = 0;
-    if (filetype >= 0 && filetype < 56 && (simexfuncs[filetype].closefunc) != 0)
-    {
-        if (simexfuncs[filetype].closefunc(inst))
-        {
-            i1 = 1;
-        }
-    }
-    else
-    {
-        SIMEX_seterror("The file format passed to SIMEX_close is not supported.");
-    }
-    if (inst->filestruct && !gclose(inst->filestruct))
-    {
-        if (i1)
-        {
-            SIMEX_seterror("Problem closing Simex::FileHandle.");
-        }
-        i1 = 0;
-    }
-    if (inst->filestruct2 && !gclose(inst->filestruct2))
-    {
-        if (i1)
-        {
-            SIMEX_seterror("Problem closing Simex::FileHandle.");
-        }
-        i1 = 0;
-    }
-    delete inst;
-    return i1;
-}
-
-int SIMEX_create(const char* filename, unsigned int filetype, SINSTANCE** instance)
-{
-    *instance = 0;
-    if (filetype <= 55 && simexfuncs[filetype].createfunc)
-    {
-        *instance = new SINSTANCE;
-        if (*instance)
-        {
-            memset(*instance, 0, sizeof(SINSTANCE));
-            char *c1 = (*instance)->filename;
-            char c2;
-            do
-            {
-                c2 = *filename;
-                *c1++ = *filename++;
-            } while (c2);
-            (*instance)->filetype = filetype;
-            if (simexfuncs[filetype].createfunc(*instance) > 0)
-            {
-                return 1;
-            }
-        }
-    }
-    else
-    {
-        SIMEX_seterror("The file format passed to SIMEX_create is not supported.");
-    }
-    if (*instance)
-    {
-        delete (*instance);
-    }
-    *instance = 0;
-    return 0;
-}
-
-int SIMEX_wclose(SINSTANCE* instance)
-{
-    int filetype = instance->filetype;
-    int result;
-    if (filetype >= 0 && filetype < 56 && (simexfuncs[filetype].wclosefunc) != 0)
-    {
-        result = simexfuncs[filetype].wclosefunc(instance);
-        delete instance;
-    }
-    else
-    {
-        SIMEX_seterror("The file format passed to SIMEX_wclose is not supported.");
-        result = 0;
-    }
-    return result;
-}
-
 int codecmatch(int filetype, int codec)
 {
     SABOUT about;
@@ -3581,7 +3264,7 @@ int codecmatch(int filetype, int codec)
     {
         return 0;
     }
-    char *codecs = about.encodecodecs;
+    char* codecs = about.encodecodecs;
     while (codec != c)
     {
         c = *++codecs;
@@ -3630,7 +3313,7 @@ int playlocmatch(int a1, SSOUND* a2)
 
 int freessound(SINFO* info, int soundid)
 {
-    SSOUND *sound = info->sound[soundid];
+    SSOUND* sound = info->sound[soundid];
     if (!sound)
     {
         return 0;
@@ -3706,7 +3389,7 @@ int freessound(SINFO* info, int soundid)
         {
             if (!info->sound[i2])
             {
-                for (SSOUND **s = &info->sound[i1] + i2; !*s; ++i1)
+                for (SSOUND** s = &info->sound[i1] + i2; !*s; ++i1)
                     ++s;
                 info->sound[i2] = *(&info->sound[i1] + i2);
                 *(&info->sound[i1] + i2) = 0;
@@ -3858,7 +3541,6 @@ int SIMEX_write(SINSTANCE* instance, SINFO* info, int element)
         + ((about.flags2 >> 1) & 1);
     for (int soundcount = 0; soundcount < info->soundcount; soundcount++)
     {
-        int sample_rate;
         sound = info->sound[soundcount];
         if (sound->sample_rate <= 0)
         {
@@ -3914,7 +3596,7 @@ int SIMEX_write(SINSTANCE* instance, SINFO* info, int element)
         }
         if (codec == layer2)
         {
-            sample_rate = sound->sample_rate;
+            int sample_rate = sound->sample_rate;
             if (sample_rate != 16000
                 && sample_rate != 22050
                 && sample_rate != 24000
@@ -3966,13 +3648,13 @@ int SIMEX_write(SINSTANCE* instance, SINFO* info, int element)
                 return 0;
             }
         }
-        sample_rate = info->sound[soundcount]->sample_rate;
         if (codec == ealayer3
             || codec == ealayer30_int
             || codec == ealayer3_int
             || codec == ealayer3pcm_int
             || codec == ealayer3spike_int)
         {
+            int sample_rate = info->sound[soundcount]->sample_rate;
             int sample_rate2 = sound->sample_rate;
             if (sample_rate2 != 16000
                 && sample_rate2 != 22050
@@ -3981,7 +3663,7 @@ int SIMEX_write(SINSTANCE* instance, SINFO* info, int element)
                 && sample_rate2 != 44100
                 && sample_rate2 != 48000)
             {
-                SINFO *info2 = new SINFO;
+                info2 = new SINFO;
                 if (!copysinfo(info2, info))
                 {
                     return ret;
@@ -4022,35 +3704,37 @@ int SIMEX_write(SINSTANCE* instance, SINFO* info, int element)
         }
         if (sound->codec == layer3)
         {
-            int sample_rate = sound->sample_rate;
-            if (sample_rate != 8000
-                && sample_rate != 11025
-                && sample_rate != 12000
-                && sample_rate != 16000
-                && sample_rate != 22050
-                && sample_rate != 24000
-                && sample_rate != 32000
-                && sample_rate != 44100
-                && sample_rate != 48000)
+            int sample_rate2 = sound->sample_rate;
+            if (sample_rate2 != 8000
+                && sample_rate2 != 11025
+                && sample_rate2 != 12000
+                && sample_rate2 != 16000
+                && sample_rate2 != 22050
+                && sample_rate2 != 24000
+                && sample_rate2 != 32000
+                && sample_rate2 != 44100
+                && sample_rate2 != 48000)
             {
                 info2 = new SINFO;
                 if (!copysinfo(info2, info))
-                    return ret;
-                SIMEXFILTERPARAM param;
-                if (sample_rate >= 8000)
                 {
-                    if ((sample_rate - 8001) > 3023)
+                    return ret;
+                }
+                SIMEXFILTERPARAM param;
+                if (sample_rate2 >= 8000)
+                {
+                    if ((sample_rate2 - 8001) > 3023)
                     {
-                        if ((sample_rate - 11026) > 973)
+                        if ((sample_rate2 - 11026) > 973)
                         {
-                            if ((sample_rate - 12001) > 3998)
+                            if ((sample_rate2 - 12001) > 3998)
                             {
-                                if ((sample_rate - 16001) > 6048)
+                                if ((sample_rate2 - 16001) > 6048)
                                 {
-                                    if ((sample_rate - 22051) > 1948)
+                                    if ((sample_rate2 - 22051) > 1948)
                                     {
-                                        if ((sample_rate - 24001) > 7998)
-                                            param.intparam = (sample_rate - 32001) > 12098 ? 48000 : 44100;
+                                        if ((sample_rate2 - 24001) > 7998)
+                                            param.intparam = (sample_rate2 - 32001) > 12098 ? 48000 : 44100;
                                         else
                                             param.intparam = 32000;
                                     }
@@ -4086,7 +3770,7 @@ int SIMEX_write(SINSTANCE* instance, SINFO* info, int element)
                 SIMEX_filterssound(info->sound[soundcount], resample, &param);
                 printwarning(
                     "Non-standard MPEG sample rate of %i detected.  Resampling to %i...\n",
-                    sample_rate,
+                    sample_rate2,
                     param.intparam);
             }
         }
@@ -4227,11 +3911,345 @@ const char* codecnames[33] = {
     "EALayer3 Interleaved (Version 2) Spike"
 };
 
-const char* SIMEX_getsamplerepname(unsigned int codec)
+extern "C"
 {
-    if (codec > 32)
+    SIMEXFILTERABOUT* SIMEX_filterabout(int type)
     {
-        return "Unknown";
+        if (type <= 299)
+        {
+            return (filterabout[type].name != 0 ? &filterabout[type] : 0);
+        }
+        SIMEX_seterror("Filter type is out of range.");
+        return 0;
     }
-    return codecnames[codec];
+
+    int SIMEX_filterssound(SSOUND* sound, int filter, SIMEXFILTERPARAM* param)
+    {
+        if (filterfuncs[filter])
+        {
+            return filterfuncs[filter](sound, param);
+        }
+        SIMEX_seterror("Filter type is not implemented.");
+        return -1;
+    }
+
+    const char* SIMEX_getlasterr()
+    {
+        return simexerror;
+    }
+
+    int SIMEX_about(int type, SABOUT* about)
+    {
+        if (about)
+        {
+            if (type > 55)
+            {
+                SIMEX_seterror("The file format passed to SIMEX_about is not supported.");
+                return 0;
+            }
+            else if (simexfuncs[type].aboutfunc)
+            {
+                memset(about, 0, sizeof(SABOUT));
+                return simexfuncs[type].aboutfunc(about);
+            }
+            else
+            {
+                SIMEX_seterror("The file format passed to SIMEX_about is not supported.");
+                return 0;
+            }
+        }
+        else
+        {
+            SIMEX_seterror("A NULL SABOUT was passed to SIMEX_about.");
+            return 0;
+        }
+    }
+
+    int SIMEX_id(const char* filename, long long offset)
+    {
+        int i1 = -1;
+        int i2 = 0;
+        int i3 = 0;
+        STDSTREAM* stream = gopen(filename);
+        if (stream)
+        {
+            gseek(stream, offset);
+        }
+        int i4 = 0;
+        int i5[1];
+        i5[0] = mpeg;
+        int i6 = 0;
+        int i = 0;
+        for (;;)
+        {
+            int i7 = 0;
+            while (i4 != i5[i7])
+            {
+                if (++i7 >= 1)
+                {
+                    if (simexfuncs[i].idfunc && simexfuncs[i].isvalid)
+                    {
+                        int i8 = simexfuncs[i].idfunc(filename, offset, stream);
+                        i3 = i8;
+                        if (i8 > i2)
+                        {
+                            i2 = i8;
+                            i1 = i6;
+                        }
+                        if (stream)
+                        {
+                            gseek(stream, offset);
+                        }
+                    }
+                    if (i3 == 100)
+                    {
+                        goto l1;
+                    }
+                    i4 = i6;
+                    break;
+                }
+            }
+            ++i4;
+            ++i;
+            i6 = i4;
+            if (i < 56)
+            {
+                continue;
+            }
+            break;
+        }
+    l1:
+        if (i2 != 100)
+        {
+            int i9 = 0;
+            for (i = 0; i < 1; ++i)
+            {
+                int i10 = i5[i9];
+                if (simexfuncs[i10].idfunc && simexfuncs[i10].isvalid)
+                {
+                    int i12 = simexfuncs[i10].idfunc(filename, offset, stream);
+                    i3 = i12;
+                    if (i12 > i2)
+                    {
+                        i2 = i12;
+                        i1 = i10;
+                    }
+                    if (stream)
+                    {
+                        gseek(stream, offset);
+                    }
+                }
+                if (i3 == 100)
+                {
+                    break;
+                }
+                i9 = i + 1;
+            }
+        }
+        if (stream)
+        {
+            gclose(stream);
+        }
+        return i1;
+    }
+
+    int SIMEX_open(const char* filename, long long fileoffset, int filetype, SINSTANCE** instance)
+    {
+        int i1 = 0;
+        if (filetype <= 55)
+        {
+            bool b = simexfuncs[filetype].openfunc == 0;
+            if (!b)
+            {
+                *instance = new SINSTANCE;
+                if (*instance)
+                {
+                    memset(*instance, 0, sizeof(SINSTANCE));
+                    (*instance)->numsounds = 1;
+                    (*instance)->fileoffset = fileoffset;
+                    (*instance)->filetype = filetype;
+                    const char* c1 = filename;
+                    char* c2 = (*instance)->filename;
+                    char c;
+                    do
+                    {
+                        c = *c1;
+                        *c2++ = *c1++;
+                    } while (c);
+                    (*instance)->filestruct = gopen(filename);
+                    if ((*instance)->filestruct)
+                    {
+                        gseek((*instance)->filestruct, fileoffset);
+                    }
+                    i1 = simexfuncs[filetype].openfunc(*instance);
+                    if (i1 > 0)
+                    {
+                        return i1;
+                    }
+                }
+                if ((*instance)->filestruct)
+                {
+                    gclose((*instance)->filestruct);
+                }
+                if (*instance)
+                {
+                    delete (*instance);
+                    *instance = 0;
+                }
+                return i1;
+            }
+        }
+        SIMEX_seterror("The file format passed to SIMEX_open is not supported.");
+        return 0;
+    }
+
+    int SIMEX_info(SINSTANCE* instance, SINFO** info, int element)
+    {
+        int filetype = instance->filetype;
+        if (filetype >= 0 && filetype < 56 && simexfuncs[filetype].infofunc)
+        {
+            gseek(instance->filestruct, instance->fileoffset);
+            return simexfuncs[instance->filetype].infofunc(instance, info, element);
+        }
+        else
+        {
+            *info = 0;
+            SIMEX_seterror("The file format passed to SIMEX_info is not supported.");
+            return 0;
+        }
+    }
+
+    int SIMEX_read(SINSTANCE* instance, SINFO* info, int element)
+    {
+        if (info)
+        {
+            int filetype = instance->filetype;
+            if (filetype >= 0 && filetype < 56 && simexfuncs[filetype].readfunc)
+            {
+                gseek(instance->filestruct, instance->fileoffset);
+                return simexfuncs[instance->filetype].readfunc(instance, info, element);
+            }
+            else
+            {
+                SIMEX_seterror("The file format passed to SIMEX_read is not supported.");
+                return 0;
+            }
+        }
+        else
+        {
+            SIMEX_seterror("A NULL SINFO structure was passed to SIMEX_read.");
+            return 0;
+        }
+    }
+
+    int SIMEX_close(SINSTANCE* inst)
+    {
+        int filetype = inst->filetype;
+        int i1 = 0;
+        if (filetype >= 0 && filetype < 56 && (simexfuncs[filetype].closefunc) != 0)
+        {
+            if (simexfuncs[filetype].closefunc(inst))
+            {
+                i1 = 1;
+            }
+        }
+        else
+        {
+            SIMEX_seterror("The file format passed to SIMEX_close is not supported.");
+        }
+        if (inst->filestruct && !gclose(inst->filestruct))
+        {
+            if (i1)
+            {
+                SIMEX_seterror("Problem closing Simex::FileHandle.");
+            }
+            i1 = 0;
+        }
+        if (inst->filestruct2 && !gclose(inst->filestruct2))
+        {
+            if (i1)
+            {
+                SIMEX_seterror("Problem closing Simex::FileHandle.");
+            }
+            i1 = 0;
+        }
+        delete inst;
+        return i1;
+    }
+
+    int SIMEX_create(const char* filename, unsigned int filetype, SINSTANCE** instance)
+    {
+        *instance = 0;
+        if (filetype <= 55 && simexfuncs[filetype].createfunc)
+        {
+            *instance = new SINSTANCE;
+            if (*instance)
+            {
+                memset(*instance, 0, sizeof(SINSTANCE));
+                char* c1 = (*instance)->filename;
+                char c2;
+                do
+                {
+                    c2 = *filename;
+                    *c1++ = *filename++;
+                } while (c2);
+                (*instance)->filetype = filetype;
+                if (simexfuncs[filetype].createfunc(*instance) > 0)
+                {
+                    return 1;
+                }
+            }
+        }
+        else
+        {
+            SIMEX_seterror("The file format passed to SIMEX_create is not supported.");
+        }
+        if (*instance)
+        {
+            delete (*instance);
+        }
+        *instance = 0;
+        return 0;
+    }
+
+    int SIMEX_wclose(SINSTANCE* instance)
+    {
+        int filetype = instance->filetype;
+        int result;
+        if (filetype >= 0 && filetype < 56 && (simexfuncs[filetype].wclosefunc) != 0)
+        {
+            result = simexfuncs[filetype].wclosefunc(instance);
+            delete instance;
+        }
+        else
+        {
+            SIMEX_seterror("The file format passed to SIMEX_wclose is not supported.");
+            result = 0;
+        }
+        return result;
+    }
+
+    const char* SIMEX_getsamplerepname(unsigned int codec)
+    {
+        if (codec > 32)
+        {
+            return "Unknown";
+        }
+        return codecnames[codec];
+    }
+
+    void SIMEX_init()
+    {
+        static EA::Allocator::ICoreAllocator allocator;
+        rw::audio::core::System::CreateInstance(&allocator);
+        rw::audio::core::System::GetInstance()->Lock();
+        rw::audio::core::System::GetInstance()->GetDecoderRegistry()->RegisterAllDecoders();
+        rw::audio::core::System::GetInstance()->GetEncoderRegistry()->RegisterAllEncoders();
+        rw::audio::core::System::GetInstance()->Unlock();
+    }
+
+    void SIMEX_shutdown()
+    {
+        rw::audio::core::System::GetInstance()->Release();
+    }
 }

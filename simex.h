@@ -1,5 +1,5 @@
 #pragma once
-#include "fileio.h"
+struct STDSTREAM;
 enum filetype
 {
     aiff = 0,
@@ -340,16 +340,28 @@ struct SIMEXFILTERPARAM
     int unk;
 };
 
-int SIMEX_close(SINSTANCE* inst);
-int SIMEX_create(const char* filename, unsigned int filetype, SINSTANCE** instance);
-SIMEXFILTERABOUT* SIMEX_filterabout(int type);
-int SIMEX_filterssound(SSOUND* sound, int filter, SIMEXFILTERPARAM* param);
-int SIMEX_freesinfo(SINFO* info);
-const char* SIMEX_getlasterr();
-const char* SIMEX_getsamplerepname(unsigned int codec);
-int SIMEX_id(const char* filename, long long offset);
-int SIMEX_info(SINSTANCE* instance, SINFO** info, int element);
-int SIMEX_open(const char* filename, long long fileoffset, int filetype, SINSTANCE** instance);
-int SIMEX_read(SINSTANCE* instance, SINFO* info, int element);
-int SIMEX_wclose(SINSTANCE* instance);
-int SIMEX_write(SINSTANCE* instance, SINFO* info, int element);
+#ifdef AUDIO_EXPORTS
+#   define SIMEX_API __declspec(dllexport)
+#else
+#   define SIMEX_API __declspec(dllimport)
+#endif
+
+extern "C"
+{
+    SIMEX_API int SIMEX_about(int type, SABOUT* about);
+    SIMEX_API int SIMEX_close(SINSTANCE* inst);
+    SIMEX_API int SIMEX_create(const char* filename, unsigned int filetype, SINSTANCE** instance);
+    SIMEX_API SIMEXFILTERABOUT* SIMEX_filterabout(int type);
+    SIMEX_API int SIMEX_filterssound(SSOUND* sound, int filter, SIMEXFILTERPARAM* param);
+    SIMEX_API int SIMEX_freesinfo(SINFO* info);
+    SIMEX_API const char* SIMEX_getlasterr();
+    SIMEX_API const char* SIMEX_getsamplerepname(unsigned int codec);
+    SIMEX_API int SIMEX_id(const char* filename, long long offset);
+    SIMEX_API int SIMEX_info(SINSTANCE* instance, SINFO** info, int element);
+    SIMEX_API int SIMEX_open(const char* filename, long long fileoffset, int filetype, SINSTANCE** instance);
+    SIMEX_API int SIMEX_read(SINSTANCE* instance, SINFO* info, int element);
+    SIMEX_API int SIMEX_wclose(SINSTANCE* instance);
+    SIMEX_API int SIMEX_write(SINSTANCE* instance, SINFO* info, int element);
+    SIMEX_API void SIMEX_init();
+    SIMEX_API void SIMEX_shutdown();
+}

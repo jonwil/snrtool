@@ -120,7 +120,6 @@ void buildfilename(char* s1, int size, const char* s2, const char* s3, const cha
 
 STDSTREAM* gwopen(char* filename)
 {
-    int filemode = 3;
     char fname[1024];
     fname[0] = 0;
     struct _stat64i32 stat;

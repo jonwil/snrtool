@@ -15,13 +15,33 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="snrtool.cpp">
+    <ClInclude Include="eabits.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fileio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="simex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="eabits.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="fileio.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="simex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="simex.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <Object Include="decoders.obj" />
+    <Object Include="encoders.obj" />
+    <Object Include="resample.obj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="libmp3lame.lib" />
   </ItemGroup>
 </Project>

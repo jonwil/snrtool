@@ -246,7 +246,7 @@ namespace rw {
                 }
                 if (mpEncoderRegistry)
                 {
-                    //mpEncoderRegistry->Release(); //todo
+                    mpEncoderRegistry->Release();
                 }
                 mpAllocator->Free(this, 0);
                 spInstance = nullptr;
@@ -303,12 +303,12 @@ namespace rw {
                 Decoder* d = new(v) Decoder;
                 d->mpReleaseEvent = desc->pReleaseEvent;
                 d->mSampleBufferStorage = nullptr;
-                d->mNumChannels = numChannels;
+                d->mNumChannels = (unsigned char)numChannels;
                 d->mpSystemUseGetSystemAccessor = pSystem;
                 desc->pCreateInstanceEvent(d);
                 d->mpDecoder = d;
                 d->mpDecodeEvent = desc->pDecodeEvent;
-                d->mMaxSlots = maxRequests;
+                d->mMaxSlots = (unsigned char)maxRequests;
                 d->mInstanceSize = size2;
                 d->mGuid = desc->guid;
                 d->mDecodedSamplesAvailable = 0;

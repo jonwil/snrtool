@@ -150,11 +150,11 @@ namespace rw {
                 static SampleBuffer* CreateInstance(unsigned int numChannels, unsigned int maxLocks, unsigned int maxSamples, void* pMem, void* pStorage, rw::audio::core::System* pSystem)
                 {
                     SampleBuffer* buf = (SampleBuffer*)pMem;
-                    buf->mNumChannels = numChannels;
+                    buf->mNumChannels = (char)numChannels;
                     buf->mpSystem = pSystem;
                     buf->mpStorage = (float*)pStorage;
                     buf->mNumSamples = 0;
-                    buf->mMaxSamples = maxSamples;
+                    buf->mMaxSamples = (unsigned short)maxSamples;
                     return buf;
                 }
                 static unsigned int CalculateStorageSize(unsigned int numChannels, unsigned int maxSamples)
@@ -170,7 +170,7 @@ namespace rw {
                 }
                 void SetNumSamples(unsigned int numSamples)
                 {
-                    mNumSamples = numSamples;
+                    mNumSamples = (unsigned short)numSamples;
                 }
                 unsigned int GetNumSamples()
                 {
@@ -215,7 +215,7 @@ namespace rw {
                 void SetSystem(System* system) { mpSystemUseGetSystemAccessor = system; }
                 RequestDesc* GetRequestDescArray() { return (RequestDesc*)((char*)this + mRequestDescOffset); }
                 RequestDesc* GetRequestDesc(unsigned int slot) { return (RequestDesc*)((char*)this + sizeof(RequestDesc) * slot + mRequestDescOffset); }
-                void SetChannels(unsigned int numChannels) { mNumChannels = numChannels; }
+                void SetChannels(unsigned int numChannels) { mNumChannels = (unsigned char)numChannels; }
                 SampleBuffer* GetSampleBuffer() { return (SampleBuffer*)((char*)this + mSampleBufferOffset); }
                 RequestDesc* AdvanceSlot(unsigned char* pSlot); //todo
                 void AdvanceDecodeState(int numSamples); //todo
@@ -332,7 +332,7 @@ namespace rw {
                 void SetSystem(System* system) { mpSystem = system; }
                 System* GetSystem() { return mpSystem; }
                 int GetChannels() { return mNumChannels; }
-                void SetChannels(int channels) { mNumChannels = channels; }
+                void SetChannels(int channels) { mNumChannels = (unsigned char)channels; }
                 void SetSampleRate(int sampleRate) { mSampleRate = sampleRate; }
                 void SetEncoderDesc(EncoderDesc* pEncoderDesc) { mpEncoderDesc = pEncoderDesc; }
                 EncoderDesc* GetEncoderDesc() { return mpEncoderDesc; }
