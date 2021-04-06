@@ -141,7 +141,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="snr.cpp" />
+    <ClCompile Include="eabits.cpp" />
+    <ClCompile Include="fileio.cpp" />
+    <ClCompile Include="simex.cpp" />
     <ClCompile Include="snrtool.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -149,6 +151,13 @@
   </ItemGroup>
   <ItemGroup>
     <Object Include="decoders.obj" />
+    <Object Include="encoders.obj" />
+    <Object Include="resample.obj" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="eabits.h" />
+    <ClInclude Include="fileio.h" />
+    <ClInclude Include="simex.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
