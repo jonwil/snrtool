@@ -111,7 +111,21 @@ namespace rw {
                 static int DecodeEvent(Decoder*, SampleBuffer*, int);
                 static DecoderDesc* GetDecoderDesc();
             };
-            DecoderDesc Xas1Dec::sDecoderDesc = { GetSize, CreateInstanceEvent, 0, DecodeEvent, 'Xas1', 128 };
+            DecoderDesc Xas1Dec::sDecoderDesc = { GetSize, CreateInstanceEvent, nullptr, DecodeEvent, 'Xas1', 128 };
+            class Layer3Dec {
+            private:
+                static const float sShiftMulLut[13];
+                static const float sFilterPairs[4][2];
+                static unsigned int GetSize(unsigned int, unsigned int*);
+                static void ReleaseEvent(Decoder*);
+                static bool CreateInstanceEvent(Decoder*);
+                static DecoderDesc sDecoderDesc;
+                void DecodeChannel(unsigned char*, float*);
+            public:
+                static int DecodeEvent(Decoder*, SampleBuffer*, int);
+                static DecoderDesc* GetDecoderDesc();
+            };
+            DecoderDesc Layer3Dec::sDecoderDesc = { GetSize, CreateInstanceEvent, ReleaseEvent, DecodeEvent, 'MP30', 1152 };
             struct Xas1Enc : public Encoder
             {
             public:
@@ -339,6 +353,7 @@ namespace rw {
             {
                 RegisterDecoder(Xas1Dec::GetDecoderDesc());
                 RegisterDecoder(Pcm16BigDec::GetDecoderDesc());
+                RegisterDecoder(Layer3Dec::GetDecoderDesc());
                 RegisterDecoder(EaLayer31Dec::GetDecoderDesc());
                 RegisterDecoder(EaLayer32PcmDec::GetDecoderDesc());
                 RegisterDecoder(EaLayer32SpikeDec::GetDecoderDesc());

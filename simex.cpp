@@ -80,6 +80,17 @@ unsigned int ggeti(unsigned char* src, int bytes)
     return data;
 }
 
+unsigned int ggetm(unsigned char* src, int bytes)
+{
+    unsigned int data = 0;
+    for (int i = bytes; i; i--)
+    {
+        data = *src + (data << 8);
+        src++;
+    }
+    return data;
+}
+
 int waveid(const char* filename, long long offset, STDSTREAM* stream)
 {
     if (!stream)
@@ -452,6 +463,59 @@ int decode_s24l_int(STDSTREAM* file, int numchannels, int firstsample, int sampl
     return 1;
 }
 
+int decode_layer3(STDSTREAM* file, long long *filepos, int numchannels, int firstsample, int samples, short** outsamples, SSOUND *sound)
+{
+    int size = file->filesize;
+    if (numchannels <= 2)
+    {
+        unsigned char* buf = new unsigned char[size + 4608];
+        if (*filepos)
+        {
+            gseek(file, *filepos);
+            size = file->filesize - (int)*filepos;
+        }
+        int count = samples - firstsample + 1;
+        if (count > 0)
+        {
+            rw::audio::core::System::GetInstance()->Lock();
+            rw::audio::core::DecoderRegistry* registry = rw::audio::core::System::GetInstance()->GetDecoderRegistry();
+            void* handle = registry->GetDecoderHandle('MP30');
+            rw::audio::core::DecoderExtended *decoder = registry->DecoderExtendedFactory(handle, numchannels, 1, rw::audio::core::System::GetInstance());
+            rw::audio::core::System::GetInstance()->Unlock();
+            gread(file, buf, size);
+            decoder->Feed(buf, count, rw::audio::core::Decoder::FEEDTYPE_NEW);
+            short* pDst[2];
+            pDst[0] = &(*outsamples)[firstsample];
+            if (sound->channel_config == 2)
+            {
+                pDst[1] = &outsamples[1][firstsample];
+            }
+            if (decoder->Decode(pDst, count) >= count)
+            {
+                decoder->Release();
+                delete[] buf;
+                return 1;
+            }
+            else
+            {
+                SIMEX_seterror("Error decoding MPEG Layer 123 data.");
+                delete[] buf;
+                return 0;
+            }
+        }
+        else
+        {
+            delete[] buf;
+            return 1;
+        }
+    }
+    else
+    {
+        SIMEX_seterror("Error decoding MPEG Layer 3 data. Only 2 channels supported at this time");
+        return 0;
+    }
+}
+
 int uncompressdata(STDSTREAM* file, long long* filepos, int firstsample, int numsamples, unsigned int numchannels, unsigned int codec, short** outsamples, SSOUND* sound)
 {
     int samples = firstsample + numsamples - 1;
@@ -468,6 +532,8 @@ int uncompressdata(STDSTREAM* file, long long* filepos, int firstsample, int num
         return decode_u8_int(file, numchannels, firstsample, samples, outsamples);
     case s24l_int:
         return decode_s24l_int(file, numchannels, firstsample, samples, outsamples);
+    case layer3:
+        return decode_layer3(file, filepos, numchannels, firstsample, samples, outsamples, sound);
     }
     SIMEX_seterror("Unsupported sample import format.");
     return 0;
@@ -2364,7 +2430,7 @@ int EncodeVersion0Snr(const char* filename, SSOUND* sound)
                 shouldflush = i7 <= prefech_samples;
             }
         l3:
-            __int64 filepos = file1->filepos;
+            long long filepos = file1->filepos;
             int samplesout;
             int out = WriteSnrBlock(filename, &file1, sound, helper, seekhelper, sampleoffset, numsamplesin, isstream, shouldflush, b, 1, &samplesout, &i3, filename2, &prefech_samples);
             ret += out;
@@ -2415,7 +2481,7 @@ int EncodeVersion0Snr(const char* filename, SSOUND* sound)
                 prefech_samples = i1;
                 if (!i9)
                 {
-                    __int64 filepos2 = file1->filepos;
+                    long long filepos2 = file1->filepos;
                     gseek(file1, filepos);
                     unsigned char buf[4];
                     gputm(buf, out, 4);
@@ -2571,6 +2637,276 @@ int sndplayerwclose(SINSTANCE* instance)
     return i;
 }
 
+int mpegabout(SABOUT* about)
+{
+    about->unk1 = -1;
+    about->unk5 = -1;
+    about->decodecodecs[0] = layer3;
+    about->decodecodecs[1] = -1;
+    about->unk10 = -1;
+    about->unk14 = -1;
+    about->encodecodecs[0] = layer3;
+    about->encodecodecs[1] = -1;
+    int result = 1;
+    about->flags1 |= 1u;
+    about->unk17 = 1;
+    about->unk18 = 1;
+    about->maxchannels = 2;
+    about->flags1 = about->flags1 | 2;
+    about->flags1 |= 0xC00000u;
+    strcpy_s(about->commandline, "mpeg");
+    strcpy_s(about->name, "MPEG");
+    return result;
+}
+
+struct HeaderStruct
+{
+    int bitrate;
+    unsigned short samplerate;
+    unsigned short samplesperframe;
+    unsigned short unk2;
+    short unk3;
+    char version;
+    char layer;
+    char numchannels;
+    char channelmode;
+    char modeextension;
+    char hascrc;
+    char padding;
+    char samperateindex;
+    char bitrateindex;
+};
+
+double samplerates[3] = { 44.1, 48.0, 32.0 };
+int bitrates1[3][15] = { { 0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448 }, { 0, 32, 48, 56,  64,  80,  96, 112, 128, 160, 192, 224, 256, 320, 384 }, { 0, 32, 40, 48,  56,  64,  80,  96, 112, 128, 160, 192, 224, 256, 320 } };
+int bitrates2[3][15] = { { 0, 32, 48, 56,  64,  80,  96, 112, 128, 144, 160, 176, 192, 224, 256 }, { 0,  8, 16, 24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160 }, { 0,  8, 16, 24,  32,  40,  48,  56,  64,  80,  96, 112, 128, 144, 160 } };
+int ParseMP3Header(unsigned int header, HeaderStruct* headerstruct)
+{
+    if ((header & 0xFFE00000) != 0xFFE00000)
+    {
+        return 0;
+    }
+    unsigned char layer = 4 - ((header >> 17) & 3);
+    headerstruct->layer = layer;
+    headerstruct->hascrc = !((header >> 16) & 1);
+    unsigned char bitrateindex = (header >> 12) & 15;
+    headerstruct->bitrateindex = bitrateindex;
+    unsigned char padding = (header >> 9) & 1;
+    headerstruct->padding = padding;
+    unsigned char channelmode = (header >> 6) & 3;
+    headerstruct->channelmode = channelmode;
+    headerstruct->modeextension = (header >> 4) & 3;
+    if (layer == 4)
+    {
+        return 0;
+    }
+    if (bitrateindex == 15)
+    {
+        return 0;
+    }
+    unsigned char version = (header >> 19) & 3;
+    headerstruct->version = version;
+    if (version == 1)
+    {
+        return 0;
+    }
+    unsigned char samplerateindex = (header >> 10) & 3;
+    headerstruct->samperateindex = samplerateindex;
+    if (samplerateindex == 3)
+    {
+        return 0;
+    }
+    headerstruct->numchannels = (channelmode != 3) + 1;
+    unsigned short samplerate = (unsigned short)(samplerates[samplerateindex] * 1000.0);
+    if (version == 2)
+    {
+        samplerate >>= 1;
+    }
+    else if (!version)
+    {
+        samplerate >>= 2;
+    }
+    headerstruct->samplerate = samplerate;
+    if (!bitrateindex)
+    {
+        return 0;
+    }
+    int bitrate;
+    if (version == 3)
+    {
+        bitrate = bitrates1[layer - 1][bitrateindex];
+    }
+    else
+    {
+        bitrate = bitrates2[layer - 1][bitrateindex];
+    }
+    unsigned int samplerate2 = headerstruct->samplerate;
+    headerstruct->bitrate = bitrate;
+    if (layer == 1)
+    {
+        headerstruct->samplesperframe = 384;
+        headerstruct->unk2 = 4 * (padding + (unsigned short)(12000 * bitrate / samplerate2));
+        headerstruct->unk2 -= 4;
+    }
+    else
+    {
+        unsigned int i2 = 144000 * bitrate / samplerate2;
+        headerstruct->samplesperframe = 1152;
+        headerstruct->unk2 = (unsigned short)i2;
+        if (layer == 3 && version != 3)
+        {
+            headerstruct->unk2 = (unsigned short)i2 >> 1;
+            headerstruct->samplesperframe = 576;
+        }
+        if (padding)
+        {
+            headerstruct->unk2++;
+        }
+        headerstruct->unk2 -= 4;
+    }
+    return headerstruct->unk2;
+}
+
+long long mpegfunc(STDSTREAM* stream)
+{
+    long long pos = stream->filepos;
+    long long ret = 0;
+    int i1 = 0;
+    do
+    {
+        gseek(stream, ret);
+        int i2 = 1;
+        for (int i = 0; i < 7; i++)
+        {
+            unsigned char buf[4];
+            if (gread(stream, buf, 4) != 4)
+            {
+                i1 = 1;
+                i2 = 0;
+                break;
+            }
+            HeaderStruct h;
+            int i3 = ParseMP3Header(ggetm(buf, 4), &h);
+            if (!i3)
+            {
+                i2 = 0;
+                break;
+            }
+            gseek(stream, i3 + stream->filepos);
+        }
+        if (i2)
+        {
+            gseek(stream, pos);
+            return ret;
+        }
+        ++ret;
+    } while (!i1);
+    gseek(stream, pos);
+    return -1;
+}
+
+int mpegid(const char* filename, long long offset, STDSTREAM* stream)
+{
+    if (stream && mpegfunc(stream) >= 0)
+    {
+        return 75;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+int mpegopen(SINSTANCE* instance)
+{
+    return 1;
+}
+
+int mpeginfo(SINSTANCE* instance, SINFO** info, int element)
+{
+    HeaderStruct header;
+    memset(&header, 0, sizeof(header));
+    int len = instance->filestruct->filesize;
+    *info = nullptr;
+    if (element)
+    {
+        SIMEX_seterror("An attempt to get info from an element other than 0 was made.");
+        return 0;
+    }
+    else
+    {
+        gseek(instance->filestruct, mpegfunc(instance->filestruct));
+        *info = new SINFO;
+        initsinfo(*info);
+        SSOUND* s = (*info)->sound[0];
+        s->num_samples = 0;
+        int i1 = 0;
+        do
+        {
+            if (instance->filestruct->filepos + 4 <= len)
+            {
+                unsigned char buf[4];
+                if (gread(instance->filestruct, buf, 4))
+                {
+                    int i2 = ParseMP3Header(ggetm(buf, 4), &header);
+                    if (i2)
+                    {
+                        gseek(instance->filestruct, i2 + instance->filestruct->filepos);
+                        s->num_samples += header.samplesperframe;
+                    }
+                    else
+                    {
+                        i1 = 1;
+                    }
+                }
+                else
+                {
+                    i1 = 1;
+                }
+            }
+            else
+            {
+                i1 = 1;
+            }
+        } while (!i1);
+        s->channel_config = header.numchannels;
+        s->sample_rate = header.samplerate;
+        s->bitrate = 1000 * header.bitrate;
+        switch (header.layer)
+        {
+        case 3:
+            s->codec = layer3;
+            break;
+        case 2:
+            s->codec = layer2;
+            break;
+        case 1:
+            s->codec = layer1;
+            break;
+        }
+        return 1;
+    }
+}
+
+int mpegread(SINSTANCE* instance, SINFO* info, int element)
+{
+    long long filepos = 0;
+    int ret = 0;
+    SSOUND* sound = info->sound[0];
+    if (allocateinputsamples(sound) >= 0)
+    {
+        gseek(instance->filestruct, mpegfunc(instance->filestruct));
+        filepos = instance->filestruct->filepos;
+        ret = uncompressdata(instance->filestruct, &filepos, 0, sound->num_samples, sound->channel_config, sound->codec, sound->decodedsamples, sound);
+    }
+    return ret;
+}
+
+int mpegclose(SINSTANCE* instance)
+{
+    return 1;
+}
+
 SimexFuncs simexfuncs[56] = {
     { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0 }, //aiff 1
     { waveabout, waveid, waveopen, waveinfo, waveread, waveclose, wavecreate, wavewrite, wavewclose, 1 }, //wave 2
@@ -2606,7 +2942,7 @@ SimexFuncs simexfuncs[56] = {
     { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0 }, //unk 32
     { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0 }, //unk 33
     { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0 }, //unk 34
-    { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0 }, //mpeg 35
+    { mpegabout, mpegid, mpegopen, mpeginfo, mpegread, mpegclose, nullptr, nullptr, nullptr, 1 }, //mpeg 35
     { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0 }, //sndstream 36
     { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0 }, //xenonbank 37
     { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0 }, //pspbank 38
