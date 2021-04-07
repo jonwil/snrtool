@@ -1307,7 +1307,7 @@ int sndplayerinfo(SINSTANCE* instance, SINFO** info, int element)
                 break;
             case SNDPLAYER_CODEC_SIGN16BIG_INT:
                 sound->bitrate = -1;
-                sound->codec = 1;
+                sound->codec = s16b_int;
                 result = 1;
                 break;
             case SNDPLAYER_CODEC_EAXMA:
