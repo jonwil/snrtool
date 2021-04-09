@@ -350,12 +350,12 @@ extern "C"
 {
     SIMEX_API int SIMEX_about(int type, SABOUT* about);
     SIMEX_API int SIMEX_close(SINSTANCE* inst);
-    SIMEX_API int SIMEX_create(const char* filename, unsigned int filetype, SINSTANCE** instance);
+    SIMEX_API int SIMEX_create(const char* filename, int filetype, SINSTANCE** instance);
     SIMEX_API SIMEXFILTERABOUT* SIMEX_filterabout(int type);
     SIMEX_API int SIMEX_filterssound(SSOUND* sound, int filter, SIMEXFILTERPARAM* param);
     SIMEX_API int SIMEX_freesinfo(SINFO* info);
     SIMEX_API const char* SIMEX_getlasterr();
-    SIMEX_API const char* SIMEX_getsamplerepname(unsigned int codec);
+    SIMEX_API const char* SIMEX_getsamplerepname(int codec);
     SIMEX_API int SIMEX_id(const char* filename, long long offset);
     SIMEX_API int SIMEX_info(SINSTANCE* instance, SINFO** info, int element);
     SIMEX_API int SIMEX_open(const char* filename, long long fileoffset, int filetype, SINSTANCE** instance);

@@ -949,7 +949,9 @@ enum SndPlayerCodec
     SNDPLAYER_CODEC_EALAYER32SPIKE_INT = 0x7,
     SNDPLAYER_CODEC_GCADPCM = 0x8,
     SNDPLAYER_CODEC_EASPEEX = 0x9,
-    SNDPLAYER_CODEC_MAX = 0xA,
+    SNDPLAYER_CODEC_ATRAC9 = 0xA,
+    SNDPLAYER_CODEC_EAMP3 = 0xB,
+    SNDPLAYER_CODEC_MAX = 0xC,
 };
 
 enum SndPlayerPlayType
@@ -4513,7 +4515,7 @@ extern "C"
         return i1;
     }
 
-    int SIMEX_create(const char* filename, unsigned int filetype, SINSTANCE** instance)
+    int SIMEX_create(const char* filename, int filetype, SINSTANCE** instance)
     {
         *instance = 0;
         if (filetype <= 55 && simexfuncs[filetype].createfunc)
@@ -4565,7 +4567,7 @@ extern "C"
         return result;
     }
 
-    const char* SIMEX_getsamplerepname(unsigned int codec)
+    const char* SIMEX_getsamplerepname(int codec)
     {
         if (codec > 32)
         {
