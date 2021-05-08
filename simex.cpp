@@ -4576,9 +4576,9 @@ extern "C"
         return codecnames[codec];
     }
 
+    EA::Allocator::ICoreAllocator allocator;
     void SIMEX_init()
     {
-        static EA::Allocator::ICoreAllocator allocator;
         rw::audio::core::System::CreateInstance(&allocator);
         rw::audio::core::System::GetInstance()->Lock();
         rw::audio::core::System::GetInstance()->GetDecoderRegistry()->RegisterAllDecoders();

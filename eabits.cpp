@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <new>
+#include <algorithm>
 #include "eabits.h"
 
 namespace EA {
@@ -285,7 +286,10 @@ namespace rw {
             }
             void* DecoderRegistry::RegisterDecoder(DecoderDesc* pDecoderDesc)
             {
-                mDecoderDescList.push_back(pDecoderDesc);
+                if (std::find(mDecoderDescList.begin(), mDecoderDescList.end(), pDecoderDesc) == mDecoderDescList.end())
+                {
+                    mDecoderDescList.push_back(pDecoderDesc);
+                }
                 return pDecoderDesc;
             }
             DecoderExtended* DecoderRegistry::DecoderExtendedFactory(void* decoderHandle, unsigned int numChannels, unsigned int maxRequests, System* pSystem)
@@ -385,7 +389,10 @@ namespace rw {
             }
             void* EncoderRegistry::RegisterEncoder(EncoderDesc* pEncoderDesc)
             {
-                mEncoderDescList.push_back(pEncoderDesc);
+                if (std::find(mEncoderDescList.begin(), mEncoderDescList.end(), pEncoderDesc) == mEncoderDescList.end())
+                {
+                    mEncoderDescList.push_back(pEncoderDesc);
+                }
                 return pEncoderDesc;
             }
             EncoderExtended* EncoderRegistry::EncoderExtendedFactory(void* encoderHandle, unsigned int numChannels, int sampleRate, System* pSystem)
